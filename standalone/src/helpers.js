@@ -23,7 +23,7 @@ export async function doCaptureWork(queryParameters) {
     const url = options.url;
     latest.url = url;
     console.info('Capturing URL: ' + url + ' ...');
-    if (options.plainPuppeteer === 'true') {
+    if (true || options.plainPuppeteer === 'true') {
         return await tryWithPuppeteer(url, options);
     } else {
         try {
@@ -115,11 +115,58 @@ async function takePlainPuppeteerScreenshot(url, options) {
     const browser = await puppeteer.launch(options.launchOptions);
     const page = await browser.newPage();
     await page.goto(url);
+//	await acceptCookies(page);
     await setViewport(page, options);
+	await new Promise(r => setTimeout(r, 1100));
     await new Promise(r => setTimeout(r, options.wait_before_screenshot_ms));
+await acceptCookies(page);
+	await new Promise(r => setTimeout(r, 300));
     const buffer = await page.screenshot();
     await browser.close();
     return buffer;
+}
+
+
+async function acceptCookies(page) {
+    await page.evaluate(`
+  function findAndClickTargetElements(root, lowerCaseTextsToLookFor) {
+    if (!root) return false;
+
+    // Suchen in den normalen Elementen
+    let targetElements = Array.from(root.querySelectorAll('a, button, input[type="button"], input[type="submit"]'));
+    for (let element of targetElements) {
+        let elementText = (element.tagName.toLowerCase() === 'input') ? element.value : element.innerText;
+        elementText = elementText ? elementText.trim().toLowerCase(): '';
+
+        if (lowerCaseTextsToLookFor.some(text => elementText.includes(text))) {
+            element.click();
+            return true; // Stoppt die Suche, sobald ein Element geklickt wurde
+        }
+    }
+
+    // Suchen in Shadow DOMs
+    let allElements = Array.from(root.querySelectorAll('*'));
+    for (let element of allElements) {
+        if (element.shadowRoot) {
+            if (findAndClickTargetElements(element.shadowRoot, lowerCaseTextsToLookFor)) {
+                return true; // Stoppt die Suche, sobald ein Element im Shadow DOM geklickt wurde
+            }
+        }
+    }
+
+    return false; // Kein passendes Element gefunden
+}
+
+let textsToLookFor = ["alles akzeptieren", "accept all", "annehmen", "akzeptieren", "einverstanden", "alle akzeptieren", "zustimmen", "accept", "allow all", "allow", "cookies akzeptieren", "alle cookies akzeptieren", "ich akzeptiere", "alle zulassen", "agree to all", "erlauben", "speichern", "ablehnen", "stimme zu", "agree"];
+let lowerCaseTextsToLookFor = textsToLookFor.map(text => text.toLowerCase());
+
+// Starten der Suche im Haupt-DOM
+findAndClickTargetElements(document, lowerCaseTextsToLookFor);
+
+
+    `);
+
+    await page.waitForTimeout(500); // Kurz warten nach dem Klick
 }
 
 async function setViewport(page, options) {
