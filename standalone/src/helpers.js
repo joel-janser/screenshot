@@ -129,18 +129,20 @@ await acceptCookies(page);
 
 async function acceptCookies(page) {
     await page.evaluate(`
-  function findAndClickTargetElements(root, lowerCaseTextsToLookFor) {
+function findAndClickTargetElements(root, lowerCaseTextsToLookFor) {
     if (!root) return false;
+
+    let clickedAnyElement = false; // Verfolgen, ob irgendein Element geklickt wurde
 
     // Suchen in den normalen Elementen
     let targetElements = Array.from(root.querySelectorAll('a, button, input[type="button"], input[type="submit"]'));
     for (let element of targetElements) {
         let elementText = (element.tagName.toLowerCase() === 'input') ? element.value : element.innerText;
-        elementText = elementText ? elementText.trim().toLowerCase(): '';
+        elementText = elementText ? elementText.trim().toLowerCase() : '';
 
         if (lowerCaseTextsToLookFor.some(text => elementText.includes(text))) {
             element.click();
-            return true; // Stoppt die Suche, sobald ein Element geklickt wurde
+            clickedAnyElement = true; // Markieren, dass ein Element geklickt wurde
         }
     }
 
@@ -148,21 +150,18 @@ async function acceptCookies(page) {
     let allElements = Array.from(root.querySelectorAll('*'));
     for (let element of allElements) {
         if (element.shadowRoot) {
-            if (findAndClickTargetElements(element.shadowRoot, lowerCaseTextsToLookFor)) {
-                return true; // Stoppt die Suche, sobald ein Element im Shadow DOM geklickt wurde
-            }
+            clickedAnyElement = findAndClickTargetElements(element.shadowRoot, lowerCaseTextsToLookFor) || clickedAnyElement;
         }
     }
 
-    return false; // Kein passendes Element gefunden
+    return clickedAnyElement; // Gibt zurück, ob irgendein Element geklickt wurde
 }
 
-let textsToLookFor = ["alles akzeptieren", "accept all", "annehmen", "akzeptieren", "einverstanden", "alle akzeptieren", "zustimmen", "accept", "allow all", "allow", "cookies akzeptieren", "alle cookies akzeptieren", "ich akzeptiere", "alle zulassen", "agree to all", "erlauben", "speichern", "ablehnen", "stimme zu", "agree"];
+let textsToLookFor = ["alles akzeptieren", "accept all", "annehmen", "akzeptieren", "einverstanden", "alle akzeptieren", "zustimmen", "accept", "allow all", "allow", "cookies akzeptieren", "alle cookies akzeptieren", "ich akzeptiere", "alle zulassen", "agree to all", "erlauben", "speichern", "ablehnen", "stimme zu", "agree", "einwilligen"];
 let lowerCaseTextsToLookFor = textsToLookFor.map(text => text.toLowerCase());
 
 // Starten der Suche im Haupt-DOM
 findAndClickTargetElements(document, lowerCaseTextsToLookFor);
-
 
     `);
 
