@@ -58,7 +58,7 @@ export function allowedRequest(queryParameters) {
 export function getOptions(queryParameters) {
     const result = parseQueryParameters(queryParameters);
     result.launchOptions = {
-        // headless: false,
+       // headless: false,
         args: [
             '--no-sandbox',
             '--disable-setuid-sandbox',
@@ -114,13 +114,23 @@ async function takePlainPuppeteerScreenshot(url, options) {
     options.wait_before_screenshot_ms = options.wait_before_screenshot_ms || 300;
     const browser = await puppeteer.launch(options.launchOptions);
     const page = await browser.newPage();
-    await page.goto(url);
+   // Set a realistic user-agent string
+    const userAgent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/89.0.4389.82 Safari/537.36';
+    await page.setUserAgent(userAgent);
+
+    // Set the language to German
+await page.setExtraHTTPHeaders({
+    'Accept-Language': 'de-DE,de;q=0.9,en;q=0.8'
+});
+    await page.goto(url, {waitUntil: 'networkidle0'});
 //	await acceptCookies(page);
     await setViewport(page, options);
-	await new Promise(r => setTimeout(r, 1100));
+await acceptCookies(page);
+	await new Promise(r => setTimeout(r, 11000));
     await new Promise(r => setTimeout(r, options.wait_before_screenshot_ms));
 await acceptCookies(page);
-	await new Promise(r => setTimeout(r, 300));
+	await new Promise(r => setTimeout(r, 500));
+await acceptCookies(page);
     const buffer = await page.screenshot();
     await browser.close();
     return buffer;
@@ -129,6 +139,9 @@ await acceptCookies(page);
 
 async function acceptCookies(page) {
     await page.evaluate(`
+    
+if (typeof findAndClickTargetElements !== 'function') {
+
 function findAndClickTargetElements(root, lowerCaseTextsToLookFor) {
     if (!root) return false;
 
@@ -157,15 +170,17 @@ function findAndClickTargetElements(root, lowerCaseTextsToLookFor) {
     return clickedAnyElement; // Gibt zurück, ob irgendein Element geklickt wurde
 }
 
-let textsToLookFor = ["alles akzeptieren", "accept all", "annehmen", "akzeptieren", "einverstanden", "alle akzeptieren", "zustimmen", "accept", "allow all", "allow", "cookies akzeptieren", "alle cookies akzeptieren", "ich akzeptiere", "alle zulassen", "agree to all", "erlauben", "speichern", "ablehnen", "stimme zu", "agree", "einwilligen"];
-let lowerCaseTextsToLookFor = textsToLookFor.map(text => text.toLowerCase());
+}
 
-// Starten der Suche im Haupt-DOM
-findAndClickTargetElements(document, lowerCaseTextsToLookFor);
+        try {
+            // Starten der Suche im Haupt-DOM
+            findAndClickTargetElements(document, ["alles akzeptieren", "accept all", "annehmen", "akzeptieren", "einverstanden", "alle akzeptieren", "zustimmen", "accept", "allow all", "allow", "cookies akzeptieren", "alle cookies akzeptieren", "ich akzeptiere", "alle zulassen", "agree to all", "erlauben", "speichern", "ablehnen", "stimme zu", "agree", "einwilligen","zulassen"]);
+        } catch (error) {
+            document.body.innerHTML = '<p>Error: ' + error.message + '</p>';
+        }
 
     `);
 
-    await page.waitForTimeout(500); // Kurz warten nach dem Klick
 }
 
 async function setViewport(page, options) {
