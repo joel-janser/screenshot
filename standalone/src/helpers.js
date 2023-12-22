@@ -59,7 +59,9 @@ export function getOptions(queryParameters) {
     const result = parseQueryParameters(queryParameters);
     result.launchOptions = {
        // headless: false,
+	executablePath: '/usr/bin/google-chrome',
         args: [
+		'--window-size=1500,1000',
             '--no-sandbox',
             '--disable-setuid-sandbox',
             '--hide-scrollbars',
@@ -122,16 +124,28 @@ async function takePlainPuppeteerScreenshot(url, options) {
 await page.setExtraHTTPHeaders({
     'Accept-Language': 'de-DE,de;q=0.9,en;q=0.8'
 });
+await page.setViewport({ width: 1500, height: 1000 });
     await page.goto(url, {waitUntil: 'networkidle0'});
 //	await acceptCookies(page);
-    await setViewport(page, options);
+  //  await setViewport(page, options);
 await acceptCookies(page);
 	await new Promise(r => setTimeout(r, 11000));
     await new Promise(r => setTimeout(r, options.wait_before_screenshot_ms));
 await acceptCookies(page);
+const customHeight = 1000; // Ihre gewünschte Höhe
+
+await page.evaluate((height) => {
+  document.body.style.height = `${height}px`;
+  document.body.style.overflowY = 'hidden';
+}, customHeight);
 	await new Promise(r => setTimeout(r, 500));
 await acceptCookies(page);
-    const buffer = await page.screenshot();
+    const buffer = await page.screenshot({clip: {
+    x: 0,
+    y: 0,
+    width: 1500,
+    height: 1000
+  },fullPage: false });
     await browser.close();
     return buffer;
 }
@@ -139,45 +153,51 @@ await acceptCookies(page);
 
 async function acceptCookies(page) {
     await page.evaluate(`
-    
+
 if (typeof findAndClickTargetElements !== 'function') {
 
-function findAndClickTargetElements(root, lowerCaseTextsToLookFor) {
-    if (!root) return false;
+    function findAndClickTargetElements(root, exactMatches, partialMatches) {
+        if (!root) return false;
 
-    let clickedAnyElement = false; // Verfolgen, ob irgendein Element geklickt wurde
+        let clickedAnyElement = false; // Verfolgen, ob irgendein Element geklickt wurde
 
-    // Suchen in den normalen Elementen
-    let targetElements = Array.from(root.querySelectorAll('a, button, input[type="button"], input[type="submit"]'));
-    for (let element of targetElements) {
-        let elementText = (element.tagName.toLowerCase() === 'input') ? element.value : element.innerText;
-        elementText = elementText ? elementText.trim().toLowerCase() : '';
+        // Umwandeln aller Texte in Kleinbuchstaben
+        exactMatches = exactMatches.map(text => text.toLowerCase());
+        partialMatches = partialMatches.map(text => text.toLowerCase());
 
-        if (lowerCaseTextsToLookFor.some(text => elementText.includes(text))) {
-            element.click();
-            clickedAnyElement = true; // Markieren, dass ein Element geklickt wurde
+        // Suchen in den normalen Elementen
+        let targetElements = Array.from(root.querySelectorAll('a, button, input[type="button"], input[type="submit"]'));
+        for (let element of targetElements) {
+            let elementText = (element.tagName.toLowerCase() === 'input') ? element.value : element.innerText;
+            elementText = elementText ? elementText.trim().toLowerCase() : '';
+
+            // Prüfen auf exakte oder teilweise Übereinstimmung
+            if (exactMatches.includes(elementText) || partialMatches.some(text => elementText.includes(text))) {
+                element.click();
+                clickedAnyElement = true; // Markieren, dass ein Element geklickt wurde
+            }
         }
+
+        // Suchen in Shadow DOMs
+        let allElements = Array.from(root.querySelectorAll('*'));
+        for (let element of allElements) {
+            if (element.shadowRoot) {
+                clickedAnyElement = findAndClickTargetElements(element.shadowRoot, exactMatches, partialMatches) || clickedAnyElement;
+            }
+        }
+
+        return clickedAnyElement; // Gibt zurück, ob irgendein Element geklickt wurde
     }
 
-    // Suchen in Shadow DOMs
-    let allElements = Array.from(root.querySelectorAll('*'));
-    for (let element of allElements) {
-        if (element.shadowRoot) {
-            clickedAnyElement = findAndClickTargetElements(element.shadowRoot, lowerCaseTextsToLookFor) || clickedAnyElement;
-        }
-    }
-
-    return clickedAnyElement; // Gibt zurück, ob irgendein Element geklickt wurde
 }
 
+try {
+    // Starten der Suche im Haupt-DOM mit separaten Listen für exakte und teilweise Übereinstimmungen
+    findAndClickTargetElements(document, ["OK"], ["alles akzeptieren", "accept all", "annehmen", "akzeptieren", "einverstanden", "alle akzeptieren", "zustimmen", "accept", "allow all", "allow", "cookies akzeptieren","alle cookies","alle auswählen", "alle cookies akzeptieren", "ich akzeptiere", "alle zulassen", "agree to all", "erlauben", "speichern", "ablehnen", "stimme zu", "agree", "einwilligen","zulassen"]);
+} catch (error) {
+    document.body.innerHTML = '<p>Error: ' + error.message + '</p>';
 }
 
-        try {
-            // Starten der Suche im Haupt-DOM
-            findAndClickTargetElements(document, ["alles akzeptieren", "accept all", "annehmen", "akzeptieren", "einverstanden", "alle akzeptieren", "zustimmen", "accept", "allow all", "allow", "cookies akzeptieren", "alle cookies akzeptieren", "ich akzeptiere", "alle zulassen", "agree to all", "erlauben", "speichern", "ablehnen", "stimme zu", "agree", "einwilligen","zulassen"]);
-        } catch (error) {
-            document.body.innerHTML = '<p>Error: ' + error.message + '</p>';
-        }
 
     `);
 

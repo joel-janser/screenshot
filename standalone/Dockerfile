@@ -1,12 +1,17 @@
 FROM --platform=linux/amd64 node:16-slim
-RUN apt-get update && apt-get install --no-install-recommends -yq \
+
+# Setzen Sie Umgebungsvariablen
+ENV APT_KEY_DONT_WARN_ON_DANGEROUS_USAGE=1 \
+    PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
+
+# Führen Sie die notwendigen Installationen durch
+RUN apt-get update && apt-get install -y --no-install-recommends \
     libgconf-2-4 libxss1 libxtst6 libxshmfence1 ca-certificates wget curl \
-    gnupg2 python dumb-init
-ENV APT_KEY_DONT_WARN_ON_DANGEROUS_USAGE 1
-RUN wget -q -O - https://dl-ssl.google.com/linux/linux_signing_key.pub |\
-    apt-key add -
-RUN echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" >> /etc/apt/sources.list.d/google.list
-RUN apt-get update && apt-get install -y google-chrome-unstable git \
+    gnupg2 python dumb-init \
+    && wget -q -O - https://dl-ssl.google.com/linux/linux_signing_key.pub | apt-key add - \
+    && echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" > /etc/apt/sources.list.d/google.list \
+    && apt-get update \
+    && apt-get install -y google-chrome-stable ffmpeg git \
     fonts-ipafont-gothic fonts-wqy-zenhei fonts-thai-tlwg fonts-kacst \
     --no-install-recommends \
     && rm -rf /var/lib/apt/lists/* /src/*.deb
