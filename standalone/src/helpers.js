@@ -110,7 +110,7 @@ async function tryWithPuppeteer(url, options) {
         }
     }
 }
-
+/*
 async function takePlainPuppeteerScreenshot(url, options) {
     options.encoding = 'binary';
     options.wait_before_screenshot_ms = options.wait_before_screenshot_ms || 300;
@@ -149,6 +149,66 @@ await acceptCookies(page);
     await browser.close();
     return buffer;
 }
+*/
+
+async function takePlainPuppeteerScreenshot(url, options) {
+    options.encoding = 'binary';
+    options.wait_before_screenshot_ms = options.wait_before_screenshot_ms || 300;
+
+    const browser = await puppeteer.launch(options.launchOptions);
+    const page = await browser.newPage();
+
+    const userAgent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/89.0.4389.82 Safari/537.36';
+    await page.setUserAgent(userAgent);
+
+    await page.setExtraHTTPHeaders({
+        'Accept-Language': 'de-DE,de;q=0.9,en;q=0.8'
+    });
+    await page.setViewport({ width: 1500, height: 1000 });
+
+    try {
+        await page.goto(url, {waitUntil: 'networkidle0'});
+    } catch (e) {
+        console.error("Error during page navigation:", e);
+    }
+
+    try {
+	await new Promise(r => setTimeout(r, 3000));
+        await acceptCookies(page);
+        await new Promise(r => setTimeout(r, 9000));
+    } catch (e) {
+        console.error("Error during cookie acceptance or wait:", e);
+    }
+
+    const customHeight = 1000;
+/*
+    try {
+        await page.evaluate((height) => {
+            document.body.style.height = `${height}px`;
+            document.body.style.overflowY = 'hidden';
+        }, customHeight);
+    } catch (e) {
+        console.error("Error during page evaluation:", e);
+    }
+*/
+    let buffer = null;
+    try {
+        buffer = await page.screenshot({
+            clip: {
+                x: 0,
+                y: 0,
+                width: 1500,
+                height: 1000
+            },
+            fullPage: false
+        });
+    } catch (e) {
+        console.error("Error taking screenshot:", e);
+    }
+
+    await browser.close();
+    return buffer;
+}
 
 
 async function acceptCookies(page) {
@@ -166,15 +226,19 @@ if (typeof findAndClickTargetElements !== 'function') {
         partialMatches = partialMatches.map(text => text.toLowerCase());
 
         // Suchen in den normalen Elementen
-        let targetElements = Array.from(root.querySelectorAll('a, button, input[type="button"], input[type="submit"]'));
+        let targetElements = Array.from(root.querySelectorAll('a, button, input[type="button"], input[type="submit"], [onclick], [role="button"],.button'));
         for (let element of targetElements) {
             let elementText = (element.tagName.toLowerCase() === 'input') ? element.value : element.innerText;
             elementText = elementText ? elementText.trim().toLowerCase() : '';
 
             // Prüfen auf exakte oder teilweise Übereinstimmung
-            if (exactMatches.includes(elementText) || partialMatches.some(text => elementText.includes(text))) {
-                element.click();
-                clickedAnyElement = true; // Markieren, dass ein Element geklickt wurde
+            if (elementText.length < 32 && (exactMatches.includes(elementText) || partialMatches.some(text => elementText.includes(text)))) {
+	       const rect = element.getBoundingClientRect();
+               const isVisible = rect.top >= 0 && rect.left >= 0 && rect.bottom <= window.innerHeight && rect.right <= window.innerWidth;
+               if (isVisible) {
+                  element.click();
+                  clickedAnyElement = true;
+               }
             }
         }
 
@@ -193,7 +257,7 @@ if (typeof findAndClickTargetElements !== 'function') {
 
 try {
     // Starten der Suche im Haupt-DOM mit separaten Listen für exakte und teilweise Übereinstimmungen
-    findAndClickTargetElements(document, ["OK"], ["alles akzeptieren", "accept all", "annehmen", "akzeptieren", "einverstanden", "alle akzeptieren", "zustimmen", "accept", "allow all", "allow", "cookies akzeptieren","alle cookies","alle auswählen", "alle cookies akzeptieren", "ich akzeptiere", "alle zulassen", "agree to all", "erlauben", "speichern", "ablehnen", "stimme zu", "agree", "einwilligen","zulassen"]);
+    findAndClickTargetElements(document, ["Save","Speichern","Geht klar!","Das ist ok!", "Alles klar","OK","Verstanden","Got it!","Got it","OK, Understood!","OK, understood","Okay"], ["bestätigen", "accept","annehmen","einverständnis", "alles akzeptieren", "accept all", "annehmen", "akzeptieren", "einverstanden", "alle akzeptieren", "zustimmen", "accept", "allow all", "allow", "cookies akzeptieren","alle cookies","alle auswählen", "alle cookies akzeptieren", "ich akzeptiere", "alle zulassen", "agree to all", "erlauben", "speichern", "ablehnen", "stimme zu", "agree", "einwilligen","zulassen"]);
 } catch (error) {
     document.body.innerHTML = '<p>Error: ' + error.message + '</p>';
 }
