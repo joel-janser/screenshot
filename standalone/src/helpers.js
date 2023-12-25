@@ -1,8 +1,16 @@
 import captureWebsite from 'capture-website';
-import puppeteer from 'puppeteer';
+//import puppeteer from 'puppeteer';
+const puppeteer = (await import('puppeteer-extra')).default;
+const StealthPlugin = (await import('puppeteer-extra-plugin-stealth')).default;
+puppeteer.use(StealthPlugin());
+
+
 import PQueue from "p-queue";
 import {getConcurrency, getDefaultTimeoutSeconds, getSecret, getShowResults} from "./config.js";
 import 'dotenv/config';
+//const puppeteer = require('puppeteer-extra')
+
+// add stealth plugin and use defaults (all evasion techniques)
 
 export const queue = new PQueue({concurrency: getConcurrency()});
 
@@ -23,6 +31,24 @@ export async function doCaptureWork(queryParameters) {
     const url = options.url;
     latest.url = url;
     console.info('Capturing URL: ' + url + ' ...');
+
+   // Check if the return_html parameter is set
+    if (queryParameters.return_html === 'true') {
+        const browser = await puppeteer.launch(options.launchOptions);
+        const page = await browser.newPage();
+        await page.goto(url, { waitUntil: 'networkidle0' }); // Waits for the network to be idle
+	 await new Promise(r => setTimeout(r, 3000));
+        const html = await page.content(); // Extracts HTML
+        await browser.close();
+
+        console.info(`Returning HTML content for URL: ${url}`);
+        return {
+            statusCode: 200,
+            responseType: 'text/html',
+            buffer: html
+        };
+    }
+
     if (true || options.plainPuppeteer === 'true') {
         return await tryWithPuppeteer(url, options);
     } else {
@@ -155,11 +181,13 @@ async function takePlainPuppeteerScreenshot(url, options) {
     options.encoding = 'binary';
     options.wait_before_screenshot_ms = options.wait_before_screenshot_ms || 300;
 
+puppeteer.use(StealthPlugin())
+
     const browser = await puppeteer.launch(options.launchOptions);
     const page = await browser.newPage();
 
-    const userAgent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/89.0.4389.82 Safari/537.36';
-    await page.setUserAgent(userAgent);
+ //   const userAgent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/89.0.4389.82 Safari/537.36';
+  //  await page.setUserAgent(userAgent);
 
     await page.setExtraHTTPHeaders({
         'Accept-Language': 'de-DE,de;q=0.9,en;q=0.8'
@@ -252,10 +280,10 @@ let textSources = [
 let combinedMatches = exactMatches.concat(partialMatches).map(match => match.replace(/\s+/g, '-'));
 
 // Die className ist der letzte Eintrag in textSources
-const className = textSources[textSources.length - 1];
+const className = element.className ? element.className : ''//textSources[textSources.length - 1];
 
 // Prüfen auf Übereinstimmung in Klassennamen
-let classNameMatch =  className && partialMatches.some(match => className.includes(match));
+let classNameMatch =  className && combinedMatches.some(match => className.includes(match));
 
     // Prüfen auf exakte oder teilweise Übereinstimmung in allen Textquellen
     if (classNameMatch || textSources.some(text => text.length < 32 && (exactMatches.includes(text) || partialMatches.some(match => text.includes(match))))) {
@@ -284,7 +312,7 @@ let classNameMatch =  className && partialMatches.some(match => className.includ
 
 try {
     // Starten der Suche im Haupt-DOM mit separaten Listen für exakte und teilweise Übereinstimmungen
-    findAndClickTargetElements(document, ["Schließen","Schliessen","Close","Save","Speichern","Geht klar!","Ja, geht klar!", "Das ist ok!", "Alles klar!", "Alles klar","Auswahl übernehmen","Auswahl übernehmen!","I agree","I agree!",,"OK","Verstanden","I understand","I understand!","Got it!","Got it","OK, Understood!","OK, understood","Okay"], ["bestätigen", "ich bestätige", "accept","annehmen","einverständnis", "alles akzeptieren", "accept all", "annehmen", "akzeptieren", "einverstanden", "alle akzeptieren", "zustimmen", "accept", "allow all", "allow", "cookies akzeptieren","alle cookies","alle auswählen", "alle cookies akzeptieren", "ich akzeptiere", "alle zulassen", "agree to all", "erlauben","Auswahl übernehmen", "Auswahl speichern", "speichern", "stimme zu",  "einwilligen","zulassen"]);
+    findAndClickTargetElements(document, ["Das ist ok","Schließen","Schliessen","close","Confirm Selection","Verstanden","Verstanden!","Save","Speichern","Geht klar!","Ja, geht klar!", "Das ist ok!", "Alles klar!", "Alles klar","Auswahl übernehmen","Auswahl übernehmen!","I agree","I agree!",,"OK","Verstanden","I understand","I understand!","Got it!","Got it","OK, Understood!","OK, understood","Okay","Okay!"], ["bestätigen", "ich bestätige", "accept","annehmen","einverständnis", "alles akzeptieren", "accept all", "annehmen", "akzeptieren", "einverstanden", "alle akzeptieren", "zustimmen", "accept", "allow all", "allow", "cookies akzeptieren","alle cookies","alle auswählen", "alle cookies akzeptieren", "ich akzeptiere", "alle zulassen", "agree to all", "erlauben","Auswahl übernehmen", "Auswahl speichern", "speichern", "stimme zu",  "einwilligen","zulassen","close"]);
 } catch (error) {
     document.body.innerHTML = '<p>Error: ' + error.message + '</p>';
 }
