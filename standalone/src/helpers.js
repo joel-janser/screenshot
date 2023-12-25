@@ -58,7 +58,7 @@ export function allowedRequest(queryParameters) {
 export function getOptions(queryParameters) {
     const result = parseQueryParameters(queryParameters);
     result.launchOptions = {
-       // headless: false,
+        headless: false,
 	executablePath: '/usr/bin/google-chrome',
         args: [
 		'--window-size=1500,1000',
@@ -175,11 +175,16 @@ async function takePlainPuppeteerScreenshot(url, options) {
     try {
 	await new Promise(r => setTimeout(r, 3000));
         await acceptCookies(page);
-        await new Promise(r => setTimeout(r, 9000));
+        await new Promise(r => setTimeout(r, 8000));
+	await acceptCookies(page);
     } catch (e) {
         console.error("Error during cookie acceptance or wait:", e);
     }
-
+    try {
+	await new Promise(r => setTimeout(r, 1800));
+    } catch (e) {
+        console.error("Error during page navigation:", e);
+    }
     const customHeight = 1000;
 /*
     try {
@@ -212,7 +217,13 @@ async function takePlainPuppeteerScreenshot(url, options) {
 
 
 async function acceptCookies(page) {
-    await page.evaluate(`
+    // Find all frames on the page
+    const frames = page.frames();
+
+    // Loop through each frame
+    for (const frame of frames) {
+        // Execute evaluate in each frame
+        await frame.evaluate(`
 
 if (typeof findAndClickTargetElements !== 'function') {
 
@@ -226,13 +237,29 @@ if (typeof findAndClickTargetElements !== 'function') {
         partialMatches = partialMatches.map(text => text.toLowerCase());
 
         // Suchen in den normalen Elementen
-        let targetElements = Array.from(root.querySelectorAll('a, button, input[type="button"], input[type="submit"], [onclick], [role="button"],.button'));
+        let targetElements = Array.from(root.querySelectorAll('div, span,a, button, input[type="button"], input[type="submit"], [onclick], [role="button"],.button'));
         for (let element of targetElements) {
-            let elementText = (element.tagName.toLowerCase() === 'input') ? element.value : element.innerText;
-            elementText = elementText ? elementText.trim().toLowerCase() : '';
+let textSources = [
+        (element.tagName.toLowerCase() === 'input') ? element.value : element.innerText,
+        element.getAttribute('aria-label'),
+        element.className
+    ].filter(text => text).map(text => text.trim().toLowerCase());
 
-            // Prüfen auf exakte oder teilweise Übereinstimmung
-            if (elementText.length < 32 && (exactMatches.includes(elementText) || partialMatches.some(text => elementText.includes(text)))) {
+    // Trimmen und in Kleinbuchstaben umwandeln
+    textSources = textSources.map(text => (text.trim != undefined ? text.trim() : '').toLowerCase());
+
+// Kombinieren und Modifizieren von exactMatches und partialMatches für Klassennamen
+let combinedMatches = exactMatches.concat(partialMatches).map(match => match.replace(/\s+/g, '-'));
+
+// Die className ist der letzte Eintrag in textSources
+const className = textSources[textSources.length - 1];
+
+// Prüfen auf Übereinstimmung in Klassennamen
+let classNameMatch =  className && partialMatches.some(match => className.includes(match));
+
+    // Prüfen auf exakte oder teilweise Übereinstimmung in allen Textquellen
+    if (classNameMatch || textSources.some(text => text.length < 32 && (exactMatches.includes(text) || partialMatches.some(match => text.includes(match))))) {
+
 	       const rect = element.getBoundingClientRect();
                const isVisible = rect.top >= 0 && rect.left >= 0 && rect.bottom <= window.innerHeight && rect.right <= window.innerWidth;
                if (isVisible) {
@@ -257,13 +284,14 @@ if (typeof findAndClickTargetElements !== 'function') {
 
 try {
     // Starten der Suche im Haupt-DOM mit separaten Listen für exakte und teilweise Übereinstimmungen
-    findAndClickTargetElements(document, ["Save","Speichern","Geht klar!","Das ist ok!", "Alles klar","OK","Verstanden","Got it!","Got it","OK, Understood!","OK, understood","Okay"], ["bestätigen", "accept","annehmen","einverständnis", "alles akzeptieren", "accept all", "annehmen", "akzeptieren", "einverstanden", "alle akzeptieren", "zustimmen", "accept", "allow all", "allow", "cookies akzeptieren","alle cookies","alle auswählen", "alle cookies akzeptieren", "ich akzeptiere", "alle zulassen", "agree to all", "erlauben", "speichern", "ablehnen", "stimme zu", "agree", "einwilligen","zulassen"]);
+    findAndClickTargetElements(document, ["Schließen","Schliessen","Close","Save","Speichern","Geht klar!","Ja, geht klar!", "Das ist ok!", "Alles klar!", "Alles klar","Auswahl übernehmen","Auswahl übernehmen!","I agree","I agree!",,"OK","Verstanden","I understand","I understand!","Got it!","Got it","OK, Understood!","OK, understood","Okay"], ["bestätigen", "ich bestätige", "accept","annehmen","einverständnis", "alles akzeptieren", "accept all", "annehmen", "akzeptieren", "einverstanden", "alle akzeptieren", "zustimmen", "accept", "allow all", "allow", "cookies akzeptieren","alle cookies","alle auswählen", "alle cookies akzeptieren", "ich akzeptiere", "alle zulassen", "agree to all", "erlauben","Auswahl übernehmen", "Auswahl speichern", "speichern", "stimme zu",  "einwilligen","zulassen"]);
 } catch (error) {
     document.body.innerHTML = '<p>Error: ' + error.message + '</p>';
 }
 
 
     `);
+    }
 
 }
 
