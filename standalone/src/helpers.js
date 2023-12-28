@@ -2,7 +2,7 @@ import captureWebsite from 'capture-website';
 //import puppeteer from 'puppeteer';
 const puppeteer = (await import('puppeteer-extra')).default;
 const StealthPlugin = (await import('puppeteer-extra-plugin-stealth')).default;
-puppeteer.use(StealthPlugin());
+//puppeteer.use(StealthPlugin());
 
 
 import PQueue from "p-queue";
@@ -87,7 +87,7 @@ export function getOptions(queryParameters) {
         headless: false,
 	executablePath: '/usr/bin/google-chrome',
         args: [
-		'--window-size=1500,1000',
+	    '--window-size=1500,1000',
             '--no-sandbox',
             '--disable-setuid-sandbox',
             '--hide-scrollbars',
@@ -181,35 +181,71 @@ async function takePlainPuppeteerScreenshot(url, options) {
     options.encoding = 'binary';
     options.wait_before_screenshot_ms = options.wait_before_screenshot_ms || 300;
 
-puppeteer.use(StealthPlugin())
+//puppeteer.use(StealthPlugin())
 
     const browser = await puppeteer.launch(options.launchOptions);
     const page = await browser.newPage();
 
- //   const userAgent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/89.0.4389.82 Safari/537.36';
-  //  await page.setUserAgent(userAgent);
+    const userAgent = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
+    await page.setUserAgent(userAgent);
 
     await page.setExtraHTTPHeaders({
         'Accept-Language': 'de-DE,de;q=0.9,en;q=0.8'
     });
+	//setViewport(page,options);
     await page.setViewport({ width: 1500, height: 1000 });
+	//
 
     try {
         await page.goto(url, {waitUntil: 'networkidle0'});
     } catch (e) {
         console.error("Error during page navigation:", e);
     }
-
+try {
+	await page.evaluate(() => {
+    const lazyImages = document.querySelectorAll('img[loading="lazy"]');
+    lazyImages.forEach(img => {
+        const src = img.src;
+	    img.loading = 'eager';
+        img.src = '';
+        img.src = src;
+    });
+});
+//	setViewport(page,options);
+	await page.evaluate(async () => {
+		window.scrollTo(0,69);
+});
+   } catch (e) {
+        console.error("Error during page navigation:", e);
+    }
     try {
 	await new Promise(r => setTimeout(r, 3000));
         await acceptCookies(page);
-        await new Promise(r => setTimeout(r, 8000));
+	    await page.evaluate(async () => {
+	window.scrollTo(0,0);
+	    });
+	await page.waitForTimeout(6000);
 	await acceptCookies(page);
     } catch (e) {
         console.error("Error during cookie acceptance or wait:", e);
     }
     try {
-	await new Promise(r => setTimeout(r, 1800));
+	await page.keyboard.press('Escape');
+	await page.keyboard.press('Escape');
+	await page.keyboard.press('Escape');
+	await page.waitForTimeout(2000);
+await page.evaluate(() => {
+    return new Promise((resolve) => {
+        // Überprüfen, ob das Dokument bereits vollständig geladen ist
+        if (document.readyState === 'complete') {
+            resolve();
+        } else {
+            // Fügen Sie einen Event-Listener hinzu, der auf das 'load'-Ereignis wartet
+            window.addEventListener('load', resolve, { once: true });
+        }
+    });
+});
+
     } catch (e) {
         console.error("Error during page navigation:", e);
     }
@@ -283,7 +319,7 @@ let combinedMatches = exactMatches.concat(partialMatches).map(match => match.rep
 const className = element.className ? element.className : ''//textSources[textSources.length - 1];
 
 // Prüfen auf Übereinstimmung in Klassennamen
-let classNameMatch =  className && combinedMatches.some(match => className.includes(match));
+let classNameMatch =  className && combinedMatches.some(match => (className.includes(match) && match.length >= 5));
 
     // Prüfen auf exakte oder teilweise Übereinstimmung in allen Textquellen
     if (classNameMatch || textSources.some(text => text.length < 32 && (exactMatches.includes(text) || partialMatches.some(match => text.includes(match))))) {
@@ -312,7 +348,7 @@ let classNameMatch =  className && combinedMatches.some(match => className.inclu
 
 try {
     // Starten der Suche im Haupt-DOM mit separaten Listen für exakte und teilweise Übereinstimmungen
-    findAndClickTargetElements(document, ["Das ist ok","Schließen","Schliessen","close","Confirm Selection","Verstanden","Verstanden!","Save","Speichern","Geht klar!","Ja, geht klar!", "Das ist ok!", "Alles klar!", "Alles klar","Auswahl übernehmen","Auswahl übernehmen!","I agree","I agree!",,"OK","Verstanden","I understand","I understand!","Got it!","Got it","OK, Understood!","OK, understood","Okay","Okay!"], ["bestätigen", "ich bestätige", "accept","annehmen","einverständnis", "alles akzeptieren", "accept all", "annehmen", "akzeptieren", "einverstanden", "alle akzeptieren", "zustimmen", "accept", "allow all", "allow", "cookies akzeptieren","alle cookies","alle auswählen", "alle cookies akzeptieren", "ich akzeptiere", "alle zulassen", "agree to all", "erlauben","Auswahl übernehmen", "Auswahl speichern", "speichern", "stimme zu",  "einwilligen","zulassen","close"]);
+    findAndClickTargetElements(document, ["Das ist ok","Schließen","Schliessen","close","Save Preferences","Confirm Selection","Verstanden","Verstanden!","Save","Speichern","Geht klar!","Ja, geht klar!", "Das ist ok!", "Alles klar!", "Alles klar","Auswahl übernehmen","Auswahl übernehmen!","I agree","I agree!","OK","Verstanden","I understand","I understand!","Got it!","Got it","OK, Understood!","OK, understood","Okay","Okay!"], ["bestätigen", "ich bestätige", "accept","annehmen","einverständnis", "alles akzeptieren", "accept all", "annehmen", "akzeptieren", "einverstanden", "alle akzeptieren", "zustimmen", "accept", "allow all", "allow", "cookies akzeptieren","alle cookies","alle auswählen", "alle cookies akzeptieren", "ich akzeptiere", "alle zulassen", "agree to all", "erlauben","Auswahl übernehmen", "Auswahl speichern", "speichern", "stimme zu",  "einwilligen","zulassen","close"]);
 } catch (error) {
     document.body.innerHTML = '<p>Error: ' + error.message + '</p>';
 }
